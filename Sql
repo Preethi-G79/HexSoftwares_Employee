@@ -1,0 +1,21 @@
+
+
+CREATE TABLE Employees (
+    employee_id INT PRIMARY KEY AUTO_INCREMENT,
+    name VARCHAR(100),
+    department VARCHAR(50),
+    total_leaves INT DEFAULT 30,
+    leaves_taken INT DEFAULT 0
+);
+
+
+
+// Employees TABLE
+
+CREATE TABLE Employees (
+    employee_id INT PRIMARY KEY AUTO_INCREMENT,
+    name VARCHAR(100),
+    department VARCHAR(50),
+    total_leaves INT DEFAULT 30,
+    leaves_taken INT DEFAULT 0
+);
