@@ -1,0 +1,170 @@
+import java.sql.*;
+import java.util.Scanner;
+
+public class EmployeeLeaveManagementSystem {
+
+    private static final String DB_URL = "jdbc:mysql://localhost:3306/leave_management_db";
+    private static final String USER = "root";
+    private static final String PASS = "password";
+
+    public static Connection connect() {
+        Connection conn = null;
+        try {
+            conn = DriverManager.getConnection(DB_URL, USER, PASS);
+            System.out.println("Database connected successfully.");
+        } catch (SQLException e) {
+            System.out.println("Connection failed!");
+            e.printStackTrace();
+        }
+        return conn;
+    }
+
+    public static void addEmployee(Connection conn) throws SQLException {
+        Scanner sc = new Scanner(System.in);
+        System.out.println("Enter Employee Name: ");
+        String name = sc.nextLine();
+        System.out.println("Enter Department: ");
+        String department = sc.nextLine();
+
+        String sql = "INSERT INTO Employees (name, department) VALUES (?, ?)";
+        PreparedStatement pstmt = conn.prepareStatement(sql);
+        pstmt.setString(1, name);
+        pstmt.setString(2, department);
+        pstmt.executeUpdate();
+        System.out.println("Employee added successfully.");
+    }
+
+    public static void requestLeave(Connection conn) throws SQLException {
+        Scanner sc = new Scanner(System.in);
+        System.out.println("Enter Employee ID: ");
+        int employeeId = sc.nextInt();
+        sc.nextLine();  // Consume newline
+        System.out.println("Enter Leave Type (Sick, Vacation, etc.): ");
+        String leaveType = sc.nextLine();
+        System.out.println("Enter Leave Start Date (YYYY-MM-DD): ");
+        String startDate = sc.nextLine();
+        System.out.println("Enter Leave End Date (YYYY-MM-DD): ");
+        String endDate = sc.nextLine();
+
+        String sql = "INSERT INTO LeaveRequests (employee_id, leave_type, leave_start_date, leave_end_date) VALUES (?, ?, ?, ?)";
+        PreparedStatement pstmt = conn.prepareStatement(sql);
+        pstmt.setInt(1, employeeId);
+        pstmt.setString(2, leaveType);
+        pstmt.setDate(3, Date.valueOf(startDate));
+        pstmt.setDate(4, Date.valueOf(endDate));
+        pstmt.executeUpdate();
+        System.out.println("Leave request submitted successfully.");
+    }
+
+    public static void viewLeaveRequests(Connection conn) throws SQLException {
+        String sql = "SELECT * FROM LeaveRequests WHERE status = 'Pending'";
+        Statement stmt = conn.createStatement();
+        ResultSet rs = stmt.executeQuery(sql);
+
+        System.out.println("Pending Leave Requests:");
+        while (rs.next()) {
+            System.out.println("Request ID: " + rs.getInt("request_id") + ", Employee ID: " + rs.getInt("employee_id") +
+                               ", Leave Type: " + rs.getString("leave_type") + ", Start Date: " + rs.getDate("leave_start_date") +
+                               ", End Date: " + rs.getDate("leave_end_date") + ", Status: " + rs.getString("status"));
+        }
+    }
+
+    public static void approveLeave(Connection conn) throws SQLException {
+        Scanner sc = new Scanner(System.in);
+        System.out.println("Enter Leave Request ID to Approve: ");
+        int requestId = sc.nextInt();
+
+        // Get the leave request details
+        String getRequestSQL = "SELECT * FROM LeaveRequests WHERE request_id = ?";
+        PreparedStatement pstmt = conn.prepareStatement(getRequestSQL);
+        pstmt.setInt(1, requestId);
+        ResultSet rs = pstmt.executeQuery();
+
+        if (rs.next()) {
+            int employeeId = rs.getInt("employee_id");
+            Date startDate = rs.getDate("leave_start_date");
+            Date endDate = rs.getDate("leave_end_date");
+
+            // Calculate the number of days for the leave
+            long difference = endDate.getTime() - startDate.getTime();
+            int leaveDays = (int) (difference / (1000 * 60 * 60 * 24)) + 1;
+
+            // Update the employee's leave balance
+            String updateEmployeeSQL = "UPDATE Employees SET leaves_taken = leaves_taken + ? WHERE employee_id = ?";
+            PreparedStatement updatePstmt = conn.prepareStatement(updateEmployeeSQL);
+            updatePstmt.setInt(1, leaveDays);
+            updatePstmt.setInt(2, employeeId);
+            updatePstmt.executeUpdate();
+
+            // Approve the leave request
+            String updateRequestSQL = "UPDATE LeaveRequests SET status = 'Approved' WHERE request_id = ?";
+            PreparedStatement updateRequestPstmt = conn.prepareStatement(updateRequestSQL);
+            updateRequestPstmt.setInt(1, requestId);
+            updateRequestPstmt.executeUpdate();
+
+            System.out.println("Leave approved successfully.");
+        } else {
+            System.out.println("Leave request not found.");
+        }
+    }
+
+    public static void rejectLeave(Connection conn) throws SQLException {
+        Scanner sc = new Scanner(System.in);
+        System.out.println("Enter Leave Request ID to Reject: ");
+        int requestId = sc.nextInt();
+
+        // Reject the leave request
+        String updateRequestSQL = "UPDATE LeaveRequests SET status = 'Rejected' WHERE request_id = ?";
+        PreparedStatement updateRequestPstmt = conn.prepareStatement(updateRequestSQL);
+        updateRequestPstmt.setInt(1, requestId);
+        updateRequestPstmt.executeUpdate();
+
+        System.out.println("Leave rejected successfully.");
+    }
+
+    public static void main(String[] args) {
+        Connection conn = connect();
+        if (conn != null) {
+            Scanner sc = new Scanner(System.in);
+            try {
+                while (true) {
+                    System.out.println("Employee Leave Management System");
+                    System.out.println("1. Add Employee");
+                    System.out.println("2. Request Leave");
+                    System.out.println("3. View Leave Requests");
+                    System.out.println("4. Approve Leave");
+                    System.out.println("5. Reject Leave");
+                    System.out.println("6. Exit");
+                    System.out.print("Enter your choice: ");
+                    int choice = sc.nextInt();
+
+                    switch (choice) {
+                        case 1:
+                            addEmployee(conn);
+                            break;
+                        case 2:
+                            requestLeave(conn);
+                            break;
+                        case 3:
+                            viewLeaveRequests(conn);
+                            break;
+                        case 4:
+                            approveLeave(conn);
+                            break;
+                        case 5:
+                            rejectLeave(conn);
+                            break;
+                        case 6:
+                            System.out.println("Exiting...");
+                            conn.close();
+                            return;
+                        default:
+                            System.out.println("Invalid choice! Try again.");
+                    }
+                }
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+}
